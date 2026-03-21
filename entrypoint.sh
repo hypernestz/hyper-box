@@ -1,29 +1,42 @@
 #!/bin/bash
-# entrypoint.sh
 
-# Wait for internal networking to settle
-sleep 1
+# --- 1. Define ANSI Color Codes ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
-# Display the environment for debugging (optional)
-echo "----------------------------------------"
-echo "Starting Systemd-nspawn on Alpine Host"
-echo "User: $(whoami)"
-echo "Working Dir: $(pwd)"
-echo "----------------------------------------"
+# --- 2. Display ASCII Art ---
+echo -e "${CYAN}"
+cat << "EOF"
+hyper-box is starting...
+EOF
+echo -e "${NC}"
 
-# Replace {{VARIABLES}} in your guest configs if needed
-# Example: sed -i "s/{{PORT}}/${SERVER_PORT}/g" /etc/some-config
+echo -e "${GREEN}[+] Initializing Systemd-nspawn environment...${NC}"
 
-# Ensure the guest rootfs exists (e.g., in /home/container/rootfs)
-if [ ! -d "${GUEST_ROOTFS}" ]; then
-    echo "Error: Guest rootfs not found at ${GUEST_ROOTFS}"
+cd /home/container
+
+# Ensure the rootfs directory exists
+if [ ! -d "/home/container/rootfs" ]; then
+    echo -e "${RED}[!] Error: /home/container/rootfs not found!${NC}"
     exit 1
 fi
 
-# Execute the nspawn command. 
-# We use 'exec' so nspawn becomes PID 1 and receives shutdown signals from Pterodactyl.
-exec /usr/bin/systemd-nspawn \
-    --directory="${GUEST_ROOTFS}" \
-    --machine=ptero-guest \
-    --notify-ready=yes \
-    ${EXTRA_NSPAWN_ARGS}
+echo -e "${GREEN}[+] Container Configuration:${NC}"
+echo -e " ↳ RootFS: ${YELLOW}/home/container/rootfs${NC}"
+echo -e " ↳ Mode  : ${YELLOW}Privileged Nspawn${NC}"
+echo -e "${CYAN}=======================================${NC}"
+
+# --- 3. Parse Pterodactyl Startup ---
+# This converts {{VARIABLE}} to ${VARIABLE} so the shell can evaluate them
+MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
+
+echo -e "${GREEN}[+] Booting Guest OS...${NC}"
+echo -e "${CYAN}=======================================${NC}\n"
+
+# --- 4. Start Nspawn (Foreground) ---
+# -q: quiet mode (prevents nspawn from printing its own banner)
+# -D: specify the root directory
+eval exec /usr/bin/systemd-nspawn -q -D /home/container/rootfs ${MODIFIED_STARTUP}
