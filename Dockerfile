@@ -1,13 +1,19 @@
 FROM alpine:latest
 
-RUN apk add --no-progress --no-cache \
-    systemd-container \
-    dbus \
-    bash
+# Install systemd-nspawn and bash
+RUN apk add --no-cache systemd-container bash coreutils
 
+# Setup Pterodactyl User
+RUN adduser -D -h /home/container container
+USER container
+ENV USER=container HOME=/home/container
 WORKDIR /home/container
 
 COPY ./entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
-CMD ["/bin/bash", "/entrypoint.sh"]
+# Switch to root to handle permissions for the entrypoint
+USER root
+RUN chmod +x /entrypoint.sh
+USER container
+
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
