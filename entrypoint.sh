@@ -1,42 +1,45 @@
 #!/bin/bash
 
-# --- 1. Define ANSI Color Codes ---
-RED='\033[0;31m'
+# --- 1. Colors & Branding ---
+CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# --- 2. Display ASCII Art ---
 echo -e "${CYAN}"
 cat << "EOF"
-hyper-box is starting...
+  _   _                 __    ____  __ 
+ | | | |               \ \  / /  \/  |
+ | |_| |_   _ _ __  ___ _ _\ \  / /| \  / |
+ |  __  | | | | '_ \ / _ \ '__\ \/ / | |\/| |
+ | |  | | |_| | |_) |  __/ |   \  /  | |  | |
+ |_|  |_|\__, | .__/ \___|_|    \/    |_|  |_|
+          __/ | |                           
+         |___/|_|                           
 EOF
 echo -e "${NC}"
 
-echo -e "${GREEN}[+] Initializing Systemd-nspawn environment...${NC}"
-
+# --- 2. Environment Setup ---
 cd /home/container
 
-# Ensure the rootfs directory exists
-if [ ! -d "/home/container/rootfs" ]; then
-    echo -e "${RED}[!] Error: /home/container/rootfs not found!${NC}"
+# Map /var/lib/machines/alpine to our local rootfs for Pterodactyl compatibility
+# This ensures nspawn finds the OS tree where Pterodactyl stores files.
+ROOTFS_PATH="/home/container/rootfs"
+
+if [ ! -d "$ROOTFS_PATH" ]; then
+    echo -e "${RED}[!] Error: RootFS not found at $ROOTFS_PATH${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[+] Container Configuration:${NC}"
-echo -e " ↳ RootFS: ${YELLOW}/home/container/rootfs${NC}"
-echo -e " ↳ Mode  : ${YELLOW}Privileged Nspawn${NC}"
-echo -e "${CYAN}=======================================${NC}"
-
-# --- 3. Parse Pterodactyl Startup ---
-# This converts {{VARIABLE}} to ${VARIABLE} so the shell can evaluate them
+# --- 3. Parse Startup Command ---
+# Converts {{VAR}} from the Panel into usable shell variables
 MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
 
-echo -e "${GREEN}[+] Booting Guest OS...${NC}"
+echo -e "${GREEN}[+] Initializing Nspawn Session...${NC}"
+echo -e " ↳ Target: ${YELLOW}$ROOTFS_PATH${NC}"
 echo -e "${CYAN}=======================================${NC}\n"
 
-# --- 4. Start Nspawn (Foreground) ---
-# -q: quiet mode (prevents nspawn from printing its own banner)
-# -D: specify the root directory
-eval exec /usr/bin/systemd-nspawn -q -D /home/container/rootfs ${MODIFIED_STARTUP}
+# --- 4. Execution ---
+# We use 'eval exec' so the nspawn process replaces the shell.
+# We don't need 'sudo' inside the container if the Docker image runs as root.
+eval exec systemd-nspawn -q -D "$ROOTFS_PATH" ${MODIFIED_STARTUP}
