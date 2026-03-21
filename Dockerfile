@@ -1,9 +1,10 @@
 FROM alpine:latest
 
-# Install systemd-nspawn and bash from the edge community repository
+# Install nspawn using the edge repositories
 RUN apk add --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
-    systemd-container \
+    systemd-nspawn \
     bash \
     coreutils \
     dbus
