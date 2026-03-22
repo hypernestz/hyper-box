@@ -1,6 +1,10 @@
 FROM alpine:3.23
-ENV LANG=en_US.UTF-8
 
+ENV LANG=en_US.UTF-8
+ENV USER=container
+ENV HOME=/home/container
+
+# Install dependencies
 RUN apk update && \
     apk add --no-cache \
         bash \
@@ -9,25 +13,19 @@ RUN apk update && \
         ca-certificates \
         iproute2 \
         xz \
-        shadow
+        shadow \
+        proot
 
-RUN ARCH=$(uname -m) && \
-    mkdir -p /usr/local/bin && \
-    proot_url="https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-$(ARCH)-static" && \
-    curl -Ls "$proot_url" -o /usr/local/bin/proot && \
-    chmod 755 /usr/local/bin/proot
+# Setup Pterodactyl User
+RUN adduser -D -h /home/container -s /bin/bash container
 
-RUN adduser -D -h /home/container -s /bin/sh container
-
-USER container
-ENV USER=container
-ENV HOME=/home/container
-
+# Set working directory
 WORKDIR /home/container
 
+# Copy entrypoint and set permissions
 COPY --chown=container:container ./entrypoint.sh /entrypoint.sh
-
-
 RUN chmod +x /entrypoint.sh
 
-CMD ["/bin/sh", "/entrypoint.sh"]
+USER container
+
+CMD ["/bin/bash", "/entrypoint.sh"]
