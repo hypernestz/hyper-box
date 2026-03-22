@@ -1,36 +1,55 @@
-  #!/bin/bash
+#!/bin/bash
+set -e
 
-  # Check if file exists
-  if [ -f "$HOME/.do-not-start" ]; then
-    rm -rf "$HOME/.do-not-start"
-    cp /etc/resolv.conf "$install_path/etc/resolv.conf" -v
-    $DOCKER_RUN /bin/sh
-    exit
-  fi
+# Internal variables - define your rootfs path here
+# If you are using PRoot to run a guest OS, specify that folder:
+export install_path="${HOME}/$(echo "$HOSTNAME" | md5sum | sed 's+ .*++g')" 
+export DOCKER_RUN="proot -S ${install_path} -b /dev -b /proc -b /sys -w /root"
 
-  # Function to start NoVNC and VNC server
-  start_services() {
+# Ensure directories exist
+mkdir -p "$install_path"
+
+# Check if file exists to skip startup logic
+if [ -f "$HOME/.do-not-start" ]; then
+    echo "Maintenance mode detected (.do-not-start found). Dropping to shell."
+    rm -f "$HOME/.do-not-start"
+    /bin/bash
+    exit 0
+fi
+
+# Function to start NoVNC and VNC server
+start_services() {
+    echo "Starting NoVNC on port ${SERVER_PORT}..."
+    
     # Starting NoVNC
-    $install_path/proot --kill-on-exit -r $install_path -b /dev -b /proc -b /sys -b /tmp -w "/usr/lib/noVNC" /bin/sh -c \
-      "./utils/novnc_proxy --vnc localhost:5901 --listen 0.0.0.0:$SERVER_PORT --cert self.crt --key self.key" &>/dev/null &
+    # Note: Ensure the path to novnc_proxy is correct inside your rootfs
+    $install_path/proot -r $install_path -b /dev -b /proc -b /sys -b /tmp \
+        -w "/usr/lib/noVNC" /bin/sh -c \
+        "./utils/novnc_proxy --vnc localhost:5901 --listen 0.0.0.0:${SERVER_PORT} --cert self.crt --key self.key" > /dev/null 2>&1 &
 
-    # Set up VNCPasswd
-    chmod 0600 "$install_path$HOME/.vnc/passwd" # prerequisite
 
-    $DOCKER_RUN "export PATH=$install_path/bin:$install_path/usr/bin:$PATH HOME=$install_path$HOME LD_LIBRARY_PATH='$install_path/usr/lib:$install_path/lib:/usr/lib:/usr/lib64:/lib64:/lib'; \
-      cd $install_path$HOME; \
-      export MOZ_DISABLE_CONTENT_SANDBOX=1 \
-      MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1 \
-      MOZ_DISABLE_RDD_SANDBOX=1 \
-      MOZ_DISABLE_GMP_SANDBOX=1 \
-      HOME='$install_path$HOME' \
-      HOSTNAME=Hyperbox; \
-      $(if_x86_64 "vglrun -d egl") vncserver :0" &>/dev/null &
-    $DOCKER_RUN /bin/sh
-  }
+    if [ -f "$install_path$HOME/.vnc/passwd" ]; then
+        chmod 0600 "$install_path$HOME/.vnc/passwd"
+    fi
 
-  # Keep the service alive indefinitely
-  while true; do
-    start_services
-    sleep 86400 # Sleep for 24 hours, adjust as needed
-  done
+    echo "Starting VNC Server..."
+    $DOCKER_RUN /bin/bash -c "
+        export PATH=/bin:/usr/bin:/usr/local/bin:\$PATH;
+        export HOME=/root;
+        export MOZ_DISABLE_CONTENT_SANDBOX=1;
+        export MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1;
+        vncserver :1 -geometry 1280x720 -depth 24
+    " > /dev/null 2>&1 &
+}
+
+# Start services
+start_services
+
+# Keep the container alive and provide a shell/log output
+echo "Container is running."
+tail -f /dev/null
+cd /home/container
+echo -e "${CYAN}=======================================${NC}\n"
+
+MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
+eval exec ${MODIFIED_STARTUP}
