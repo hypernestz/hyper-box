@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# --- 1. Colors & Branding ---
+# --- 1. Colors ---
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${CYAN}"
@@ -19,21 +20,49 @@ cat << "EOF"
 EOF
 echo -e "${NC}"
 
-# --- 2. Environment Setup ---
+# --- 2. Setup ---
 cd /home/container
 
-# Map /var/lib/machines/alpine to our local rootfs for Pterodactyl compatibility
-# This ensures nspawn finds the OS tree where Pterodactyl stores files.
+# Default path nếu panel không truyền
+ROOTFS_PATH=${ROOTFS_PATH:-/home/container/rootfs}
+ALPINE_VERSION="3.20.0"
+ALPINE_URL="https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-${ALPINE_VERSION}-x86_64.tar.gz"
 
-# --- 3. Parse Startup Command ---
-# Converts {{VAR}} from the Panel into usable shell variables
+echo -e "${GREEN}[+] RootFS Path:${NC} ${YELLOW}$ROOTFS_PATH${NC}"
+
+# --- 3. Auto download nếu chưa tồn tại ---
+if [ ! -d "$ROOTFS_PATH" ] || [ -z "$(ls -A $ROOTFS_PATH 2>/dev/null)" ]; then
+    echo -e "${YELLOW}[!] RootFS not found. Downloading Alpine...${NC}"
+
+    mkdir -p "$ROOTFS_PATH"
+
+    curl -L "$ALPINE_URL" -o alpine.tar.gz || {
+        echo -e "${RED}[ERROR] Failed to download Alpine${NC}"
+        exit 1
+    }
+
+    echo -e "${GREEN}[+] Extracting Alpine...${NC}"
+    tar -xzf alpine.tar.gz -C "$ROOTFS_PATH" || {
+        echo -e "${RED}[ERROR] Failed to extract Alpine${NC}"
+        exit 1
+    }
+
+    rm alpine.tar.gz
+
+    echo -e "${GREEN}[+] Alpine rootfs ready!${NC}"
+else
+    echo -e "${GREEN}[+] RootFS already exists, skipping download.${NC}"
+fi
+
+# --- 4. Parse startup ---
 MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
 
 echo -e "${GREEN}[+] Initializing Nspawn Session...${NC}"
 echo -e " ↳ Target: ${YELLOW}$ROOTFS_PATH${NC}"
 echo -e "${CYAN}=======================================${NC}\n"
 
-# --- 4. Execution ---
-# We use 'eval exec' so the nspawn process replaces the shell.
-# We don't need 'sudo' inside the container if the Docker image runs as root.
-eval exec systemd-nspawn -q --keep-unit --directory="$ROOTFS_PATH" ${MODIFIED_STARTUP}
+# --- 5. Run nspawn ---
+exec systemd-nspawn -q \
+    --directory="$ROOTFS_PATH" \
+    --bind=/home/container \
+    ${MODIFIED_STARTUP}
