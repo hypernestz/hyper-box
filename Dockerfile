@@ -1,30 +1,33 @@
-FROM ubuntu:24.04
+FROM alpine:3.23
+ENV LANG=en_US.UTF-8
 
-# Cài đặt các công cụ cần thiết: debootstrap và proot
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y \
-    debootstrap \
-    proot \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update && \
+    apk add --no-cache \
+        bash \
+        jq \
+        curl \
+        ca-certificates \
+        iproute2 \
+        xz \
+        shadow
 
-# Tạo người dùng 'container' theo chuẩn Pterodactyl
-RUN useradd -d /home/container -m container
+RUN ARCH=$(uname -m) && \
+    mkdir -p /usr/local/bin && \
+    proot_url="https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-$(ARCH)-static" && \
+    curl -Ls "$proot_url" -o /usr/local/bin/proot && \
+    chmod 755 /usr/local/bin/proot
+
+RUN adduser -D -h /home/container -s /bin/sh container
+
 USER container
-ENV  USER=container HOME=/home/container
+ENV USER=container
+ENV HOME=/home/container
+
 WORKDIR /home/container
 
-# Tạo rootfs cho Ubuntu 24.04 tại thư mục con
-# Lưu ý: Vì Docker build chạy quyền root, ta build xong rồi chown lại
-USER root
-RUN mkdir -p /home/container/ubuntu24_root && \
-    debootstrap --variant=minbase noble /home/container/ubuntu24_root http://archive.ubuntu.com/ubuntu/ && \
-    chown -R container:container /home/container/ubuntu24_root
+COPY --chown=container:container ./entrypoint.sh /entrypoint.sh
 
-# Copy entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown container:container /entrypoint.sh
 
-USER container
-CMD ["/bin/bash", "/entrypoint.sh"]
+RUN chmod +x /entrypoint.sh
+
+CMD ["/bin/sh", "/entrypoint.sh"]
