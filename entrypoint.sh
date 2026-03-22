@@ -1,4 +1,5 @@
 #!/bin/bash
+cd /home/container
 [ -z "$HOME" ] && [ -d "/home/container" ] && export HOME="/home/container"
 export HOSTNAME="$(cat /proc/sys/kernel/hostname)"
 
