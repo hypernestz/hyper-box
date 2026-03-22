@@ -68,8 +68,8 @@ bootstrap_system() {
   mkdir -p "$install_path$HOME"
 
   proot -r . -b /dev -b /sys -b /proc -b /tmp \
-    --kill-on-exit -w $HOME /bin/sh -c "apk update && apk add bash kitty kitty-kitten konsole xorg-server git python3 py3-pip py3-numpy openssl \
-      xinit xvfb fakeroot firefox tigervnc xfce4 xfce4-terminal lightdm-gtk-greeter dbus openrc font-noto mesa-dri-gallium font-jetbrains-mono \
+    --kill-on-exit -w $HOME /bin/sh -c "apk update && apk add bash kitty kitty-kitten konsole xorg-server git python3 dropbear py3-pip py3-numpy openssl \
+      xinit xvfb fakeroot firefox tigervnc xfce4 xfce4-terminal lightdm-gtk-greeter nano dbus openrc chromium font-noto mesa-dri-gallium font-jetbrains-mono \
       py3-urllib3 py3-typing-extensions py3-redis py3-cparser py3-idna py3-charset-normalizer adwaita-xfce-icon-theme adw-gtk3 py3-certifi gcompat \
       py3-requests py3-cffi py3-cryptography py3-jwcrypto curl vscodium fastfetch xfce4-screensaver lightdm-gtk-greeter font-dejavu obs-studio gimp vlc neofetch $(if_x86_64 virtualgl) \
         --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing \
