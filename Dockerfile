@@ -13,9 +13,11 @@ RUN apk update && \
         ca-certificates \
         iproute2 \
         xz \
-        shadow \
-        proot
+        shadow 
 
+RUN apk add --no-cache bash jq curl ca-certificates iproute2 xz shadow && \
+    curl -L https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-x86_64-static -o /usr/local/bin/proot && \
+    chmod +x /usr/local/bin/proot
 # Setup Pterodactyl User
 RUN adduser -D -h /home/container -s /bin/bash container
 
