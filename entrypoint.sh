@@ -1,21 +1,36 @@
-#!/bin/bash
-# entrypoint.sh cho Pterodactyl
+  #!/bin/bash
 
-# Thư mục chứa rootfs của Ubuntu 24
-CHROOT_DIR="/home/container/ubuntu24_root"
+  # Check if file exists
+  if [ -f "$HOME/.do-not-start" ]; then
+    rm -rf "$HOME/.do-not-start"
+    cp /etc/resolv.conf "$install_path/etc/resolv.conf" -v
+    $DOCKER_RUN /bin/sh
+    exit
+  fi
 
-# Thay thế biến môi trường của Pterodactyl nếu cần
-cd /home/container
+  # Function to start NoVNC and VNC server
+  start_services() {
+    # Starting NoVNC
+    $install_path/proot --kill-on-exit -r $install_path -b /dev -b /proc -b /sys -b /tmp -w "/usr/lib/noVNC" /bin/sh -c \
+      "./utils/novnc_proxy --vnc localhost:5901 --listen 0.0.0.0:$SERVER_PORT --cert self.crt --key self.key" &>/dev/null &
 
-echo "--- Khởi động môi trường Ubuntu 24.04 qua PRoot ---"
+    # Set up VNCPasswd
+    chmod 0600 "$install_path$HOME/.vnc/passwd" # prerequisite
 
-# Chạy lệnh thông qua proot
-# -R: chỉ định rootfs
-# -0: giả lập quyền root bên trong chroot
-# -b: mount các thư mục hệ thống từ host vào chroot
+    $DOCKER_RUN "export PATH=$install_path/bin:$install_path/usr/bin:$PATH HOME=$install_path$HOME LD_LIBRARY_PATH='$install_path/usr/lib:$install_path/lib:/usr/lib:/usr/lib64:/lib64:/lib'; \
+      cd $install_path$HOME; \
+      export MOZ_DISABLE_CONTENT_SANDBOX=1 \
+      MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1 \
+      MOZ_DISABLE_RDD_SANDBOX=1 \
+      MOZ_DISABLE_GMP_SANDBOX=1 \
+      HOME='$install_path$HOME' \
+      HOSTNAME=Hyperbox; \
+      $(if_x86_64 "vglrun -d egl") vncserver :0" &>/dev/null &
+    $DOCKER_RUN /bin/sh
+  }
 
-
-MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
-
-# Use 'exec' to replace the current shell with QEMU, attaching stdin/stdout directly
-eval exec ${MODIFIED_STARTUP}
+  # Keep the service alive indefinitely
+  while true; do
+    start_services
+    sleep 86400 # Sleep for 24 hours, adjust as needed
+  done
