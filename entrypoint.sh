@@ -13,4 +13,9 @@ echo "--- Khởi động môi trường Ubuntu 24.04 qua PRoot ---"
 # -R: chỉ định rootfs
 # -0: giả lập quyền root bên trong chroot
 # -b: mount các thư mục hệ thống từ host vào chroot
-proot -R $CHROOT_DIR -0 -b /proc -b /dev -b /sys /usr/bin/bash
+
+
+MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
+
+# Use 'exec' to replace the current shell with QEMU, attaching stdin/stdout directly
+eval exec ${MODIFIED_STARTUP}
