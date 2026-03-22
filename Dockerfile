@@ -1,27 +1,30 @@
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
-# Install systemd-nspawn and essential tools
+# Cài đặt các công cụ cần thiết: debootstrap và proot
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-    systemd-container \
-    dbus \
-    bash \
-    coreutils \
+    debootstrap \
+    proot \
     curl \
-    && apt-get clean \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Setup Pterodactyl User
-RUN useradd -m -d /home/container container
+# Tạo người dùng 'container' theo chuẩn Pterodactyl
+RUN useradd -d /home/container -m container
 USER container
-ENV USER=container HOME=/home/container
+ENV  USER=container HOME=/home/container
 WORKDIR /home/container
 
-# Copy Entrypoint
-COPY ./entrypoint.sh /entrypoint.sh
-
-# Switch to root to handle permissions for the entrypoint
+# Tạo rootfs cho Ubuntu 24.04 tại thư mục con
+# Lưu ý: Vì Docker build chạy quyền root, ta build xong rồi chown lại
 USER root
-RUN chmod +x /entrypoint.sh
-USER container
+RUN mkdir -p /home/container/ubuntu24_root && \
+    debootstrap --variant=minbase noble /home/container/ubuntu24_root http://archive.ubuntu.com/ubuntu/ && \
+    chown -R container:container /home/container/ubuntu24_root
 
-ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+# Copy entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown container:container /entrypoint.sh
+
+USER container
+CMD ["/bin/bash", "/entrypoint.sh"]
