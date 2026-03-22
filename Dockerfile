@@ -13,7 +13,8 @@ RUN apk update && \
         ca-certificates \
         iproute2 \
         xz \
-        shadow 
+        shadow \
+        wget
 
 RUN apk add --no-cache bash jq curl ca-certificates iproute2 xz shadow && \
     curl -L https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-x86_64-static -o /usr/local/bin/proot && \
