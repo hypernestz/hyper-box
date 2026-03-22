@@ -54,15 +54,22 @@ else
     echo -e "${GREEN}[+] RootFS already exists, skipping download.${NC}"
 fi
 
-# --- 4. Parse startup ---
+# --- 4. Parse Startup ---
 MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
 
+# Fallback nếu panel không truyền
+MACHINE_NAME=${P_SERVER_UUID:-ptero-container}
+
 echo -e "${GREEN}[+] Initializing Nspawn Session...${NC}"
-echo -e " ↳ Target: ${YELLOW}$ROOTFS_PATH${NC}"
+echo -e " ↳ Machine: ${YELLOW}$MACHINE_NAME${NC}"
+echo -e " ↳ RootFS : ${YELLOW}$ROOTFS_PATH${NC}"
 echo -e "${CYAN}=======================================${NC}\n"
 
-# --- 5. Run nspawn ---
-exec systemd-nspawn -q \
+# --- 5. Run ---
+exec systemd-nspawn \
+    --boot \
     --directory="$ROOTFS_PATH" \
+    --machine="$MACHINE_NAME" \
+    --resolv-conf=copy-host \
     --bind=/home/container \
     ${MODIFIED_STARTUP}
