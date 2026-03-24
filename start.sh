@@ -6,29 +6,31 @@ install_path="$HOME/$(echo "$HOSTNAME" | md5sum | sed 's+ .*++g')"
 shared_path="$HOME/shared"
 user_passwd="$HOSTNAME"
 retailer_mode=false
+
+get_arch() {
+  case "$(uname -m)" in
+    x86_64) echo "x86_64" ;;
+    aarch64) echo "aarch64" ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+  esac
+}
+
 DOCKER_RUN="proot \
     --kill-on-exit -r $install_path -b /dev -b /proc -b /sys -b /tmp \
     -b $install_path/etc/hostname:/proc/sys/kernel/hostname \
     -b $install_path$HOME/shared:$shared_path \
     -b $install_path:$install_path /bin/sh -c"
-osVer="3.23"
-detailOsVer="$osVer.3"
-getarch() {
-  case "$(uname -m)" in
-  x86_64)
-    [ -z "$1" ] && echo "x86_64" || echo "$1"
-    ;;
-  aarch64)
-    [ -z "$2" ] && echo "aarch64" || echo "$2"
-    ;;
-  *)
-    echo "Unsupport architecture: $(uname -m)"
-    exit 1
-    ;;
-  esac
+get_latest_alpine_version() {
+  curl -s "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/$(get_arch)/" | \
+    grep -oP 'alpine-minirootfs-\K[0-9]+\.[0-9]+\.[0-9]+(?=-'"$(get_arch)"')' | \
+    sort -V | tail -n1
 }
+alpine_version="$(get_latest_alpine_version)"
+
+arch="$(get_arch)"
+alpine_version="$(get_latest_alpine_version)"
 if_x86_64() { [ "$(uname -m)" == "x86_64" ] && echo "$1"; }
-mirror_alpine="https://dl-cdn.alpinelinux.org/alpine/v$osVer/releases/$(getarch)/alpine-minirootfs-$detailOsVer-$(getarch).tar.gz"
+mirror_alpine="https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/$arch/alpine-minirootfs-$alpine_version-$arch.tar.gz"
 
 d.stat() { echo -ne "\033[1;37m==> \033[1;34m$@\033[0m\n"; }
 d.dftr() { echo -ne "\033[1;33m!!! DISABLED FEATURE: \033[1;31m$@ \033[1;33m!!!\n"; }
@@ -90,6 +92,35 @@ bootstrap_system() {
 session=xfce
 geometry=1600x800
 rfbport=5901
+EOF
+
+cat >"$install_path/home/container/.bashrc" <<EOF
+    echo "Wellcome to Hyper-box! powered by Alpine Linux
+        
+    The Alpine Wiki contains a large amount of how-to guides and general
+information about administrating Alpine systems.
+See https://wiki.alpinelinux.org/.
+
+Installing : apk add <pkg>
+Updating : apk update && apk upgrade
+
+You can change this motd by editing the .bashrc file
+for support visit: https://discord.gg/K2ntAwCsdJ"
+
+EOF
+
+cat >"$install_path/etc/motd" <<EOF
+    echo "Wellcome to Hyper-box! powered by Alpine Linux
+        
+    The Alpine Wiki contains a large amount of how-to guides and general
+information about administrating Alpine systems.
+See https://wiki.alpinelinux.org/.
+
+Installing : apk add <pkg>
+Updating : apk update && apk upgrade
+
+You can change this motd by editing the /etc/motd file
+for support visit: https://discord.gg/K2ntAwCsdJ"
 EOF
 }
 
